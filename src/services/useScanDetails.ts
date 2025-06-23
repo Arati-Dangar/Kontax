@@ -115,6 +115,80 @@ export const useScanDetails = () => {
     }
   };
 
+  const searchVcardDetails = async (searchTerm = '', intentFilter = '') => {
+    if (!db) return;
+
+    const term = `%${searchTerm.toLowerCase()}%`;
+
+    try {
+      const query = `
+      SELECT * FROM Vcard_details 
+      WHERE (
+        LOWER(firstName) LIKE ? OR
+        LOWER(lastName) LIKE ? OR
+        LOWER(tags) LIKE ? OR
+        LOWER(title) LIKE ?
+      )
+      ${intentFilter ? 'AND LOWER(intent) = ?' : ''}
+    `;
+
+      const params = [term, term, term, term];
+      if (intentFilter) {
+        params.push(intentFilter.toLowerCase());
+      }
+
+      const results = await db.executeSql(query, params);
+      const rows = results[0].rows;
+      const items = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        items.push(rows.item(i));
+      }
+
+      return items;
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
+  };
+
+  // const searchVcardDetails=async(searchTerm="",intentFilter="")=>{
+
+  //   if(!db) return;
+  //    const term = `%${searchTerm.toLowerCase()}%`;
+
+  //    try {
+  //     const query=`
+  //     SELECT * FROM Vcard_details WHERE(
+  //     LOWER(firstName) LIKE ? OR
+  //       LOWER(lastName) LIKE ? OR
+  //       LOWER(tags) LIKE ? OR
+  //       LOWER(title) LIKE ? OR
+
+  //     )
+  //        ${intentFilter ? "AND LOWER(intent) = ?" : ""}
+  //     `
+
+  //      const params = [term, term, term, term];
+  //   if (intentFilter) {
+  //     params.push(intentFilter.toLowerCase());
+  //   }
+
+  //   const results = await db.executeSql(query, params);
+  //   const rows = results[0].rows;
+  //   const items = [];
+
+  //   for (let i = 0; i < rows.length; i++) {
+  //     items.push(rows.item(i));
+  //   }
+
+  //   return items;
+  //    } catch (error) {
+  //        console.error("Search error:", error);
+  //   return []
+  //    }
+
+  // }
   const addScanDetail = async (detail: ScanDetail) => {
     if (!db) return;
     try {
@@ -190,6 +264,7 @@ export const useScanDetails = () => {
     addVcardDetail,
     deleteScanDetail,
     deleteVcardDetail,
+    searchVcardDetails,
     refreshScanDetails: () => db && fetchAllDetails(db),
   };
 };
