@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "983347847554",
+    "project_id": "kontax-28fbf",
+    "storage_bucket": "kontax-28fbf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983347847554:android:2f62e2fa23ec304fa46f9b",
+        "android_client_info": {
+          "package_name": "com.kontaxapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAP9Bk3iHkDZ6FTGO9VUbPBvMTNQ-nfY2g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

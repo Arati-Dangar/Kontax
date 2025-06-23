@@ -47,7 +47,8 @@ export const openPrepopulatedDB = async () => {
   notes TEXT,
   yourIntent TEXT,
   tags TEXT,
-  voiceNote TEXT
+  voiceNote TEXT,
+  isSynced INTEGER 
 
 );`,
     );

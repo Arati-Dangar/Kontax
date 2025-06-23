@@ -1,6 +1,9 @@
 import {useEffect, useState} from 'react';
 import {openPrepopulatedDB} from './db'; // make sure path is correct
 import SQLite from 'react-native-sqlite-storage';
+import {database} from '../../firebaseConfig';
+import {ref, push} from 'firebase/database';
+import NetInfo from '@react-native-community/netinfo';
 
 export interface ScanDetail {
   id?: number;
@@ -36,6 +39,7 @@ export interface VcardDetail {
   yourIntent: string;
   tags: string;
   voiceNote: string | null; // Optional field for voice note
+  isSynced: number;
 }
 export const useScanDetails = () => {
   const [db, setDb] = useState<SQLite.SQLiteDatabase | null>(null);
@@ -81,16 +85,20 @@ export const useScanDetails = () => {
       console.error('Fetch error:', e);
     }
   };
+
   const addVcardDetail = async (detail: VcardDetail) => {
     if (!db) return;
     try {
+      const isConnected = (await NetInfo.fetch()).isConnected;
+
+      // Insert into SQLite
       await db.executeSql(
         `INSERT INTO Vcard_details (
-      firstName, lastName, email, phone,
-      organization, designation, linkedln,
-      title, location, intent, date,
-      notes, yourIntent, tags,voiceNote
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`,
+        firstName, lastName, email, phone,
+        organization, designation, linkedln,
+        title, location, intent, date,
+        notes, yourIntent, tags, voiceNote, isSynced
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           detail.firstName,
           detail.lastName,
@@ -107,8 +115,31 @@ export const useScanDetails = () => {
           detail.yourIntent,
           detail.tags,
           detail.voiceNote || null,
+          isConnected ? 1 : 0,
         ],
       );
+
+      if (isConnected) {
+        const vcardRef = ref(database, 'vcards');
+        await push(vcardRef, {
+          firstName: detail.firstName,
+          lastName: detail.lastName,
+          email: detail.email,
+          phone: detail.phone,
+          organization: detail.organization,
+          designation: detail.designation,
+          linkedln: detail.linkedln,
+          title: detail.eventDetails.title,
+          location: detail.eventDetails.location,
+          intent: detail.eventDetails.intent,
+          date: detail.eventDetails.date,
+          notes: detail.notes,
+          yourIntent: detail.yourIntent,
+          tags: detail.tags,
+          voiceNote: detail.voiceNote || null,
+        });
+      }
+
       await fetchAllVcardDetails(db);
     } catch (error) {
       console.error('Insert error:', error);
@@ -152,43 +183,6 @@ export const useScanDetails = () => {
     }
   };
 
-  // const searchVcardDetails=async(searchTerm="",intentFilter="")=>{
-
-  //   if(!db) return;
-  //    const term = `%${searchTerm.toLowerCase()}%`;
-
-  //    try {
-  //     const query=`
-  //     SELECT * FROM Vcard_details WHERE(
-  //     LOWER(firstName) LIKE ? OR
-  //       LOWER(lastName) LIKE ? OR
-  //       LOWER(tags) LIKE ? OR
-  //       LOWER(title) LIKE ? OR
-
-  //     )
-  //        ${intentFilter ? "AND LOWER(intent) = ?" : ""}
-  //     `
-
-  //      const params = [term, term, term, term];
-  //   if (intentFilter) {
-  //     params.push(intentFilter.toLowerCase());
-  //   }
-
-  //   const results = await db.executeSql(query, params);
-  //   const rows = results[0].rows;
-  //   const items = [];
-
-  //   for (let i = 0; i < rows.length; i++) {
-  //     items.push(rows.item(i));
-  //   }
-
-  //   return items;
-  //    } catch (error) {
-  //        console.error("Search error:", error);
-  //   return []
-  //    }
-
-  // }
   const addScanDetail = async (detail: ScanDetail) => {
     if (!db) return;
     try {
