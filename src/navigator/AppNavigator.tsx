@@ -15,6 +15,7 @@ export type RootStackParamList = {
   QRCode: undefined;
   ContactDetailsForm: undefined;
   ScanQr: undefined;
+  VcardHistory: undefined;
 };
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const AppNavigator = () => {

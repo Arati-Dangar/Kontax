@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import {useScanDetails} from '../../services/useScanDetails';
 import Icon1 from 'react-native-vector-icons/MaterialIcons';
@@ -20,9 +22,29 @@ import {
 } from '../../constants/intentData';
 
 const EventHistoryScreen = () => {
-  const {vcardDetails, deleteVcardDetail} = useScanDetails();
+  const {vcardDetails, deleteVcardDetail, searchVcardDetails} =
+    useScanDetails();
+
   console.log('Vcard Details:', vcardDetails);
   const navigation = useNavigation();
+  const [searchText, setSearchText] = useState('');
+  const [intentFilter, setIntentFilter] = useState(''); // Optional: dropdown/select intent
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
+  const handleSearch = async () => {
+    setIsSearchActive(true);
+    setLoading(true);
+    const data = await searchVcardDetails(searchText, intentFilter);
+    setResults(data);
+    setLoading(false);
+  };
+  const clearSearch = () => {
+    setSearchText('');
+    setIntentFilter('');
+    setIsSearchActive(false);
+  };
 
   const handleLinkPress = url => {
     if (url) {
@@ -155,7 +177,6 @@ const EventHistoryScreen = () => {
         {item.intent && (
           <View style={styles.contactRow}>
             <Text style={styles.intentLabel}>Intent:</Text>
-            {/* <Text style={styles.intentText}>{item.intent}</Text> */}
 
             <Text
               style={[styles.summaryValutIntent, getIntentStyle(item.intent)]}>
@@ -170,7 +191,7 @@ const EventHistoryScreen = () => {
         {item.yourIntent && (
           <View style={styles.contactRow}>
             <Text style={styles.intentLabel}>Your Intent:</Text>
-            {/* <Text style={styles.intentText}>{item.yourIntent}</Text> */}
+
             <Text
               style={[
                 styles.summaryValutIntent,
@@ -181,29 +202,17 @@ const EventHistoryScreen = () => {
           </View>
         )}
 
-        {/* Tags */}
-        {/* {item.tags && (
-        <View style={styles.intentRow}>
-          <Text style={styles.intentLabel}>Tags:</Text>
-          <Text style={styles.intentText}>{item.tags}</Text>
-
-
-          
-        </View>
-      )} */}
         {item.tags && (
           <View style={styles.contactRow}>
             <Text style={styles.intentLabel}>Tags:</Text>
             <View style={styles.tagsContainer}>
               {getTagsPreview(item.tags).map((tag, index) => {
-                // Find matching color from synergyTags
                 const tagConfig = synergyTags.find(item => item.value === tag);
                 const backgroundColor = tagConfig?.color || '#e0e7ff';
 
                 return (
                   <View key={index} style={[styles.tag, {backgroundColor}]}>
                     <Text style={styles.tagText}>{tag}</Text>{' '}
-                    {/* FIXED: show individual tag */}
                   </View>
                 );
               })}
@@ -238,7 +247,7 @@ const EventHistoryScreen = () => {
       <View
         style={{
           backgroundColor: '#87CEFA',
-          height: 100,
+          height: 'auto',
           borderBottomLeftRadius: 30,
           borderBottomRightRadius: 30,
         }}>
@@ -255,23 +264,54 @@ const EventHistoryScreen = () => {
             <Text style={{color: 'white', fontSize: 18}}>Back</Text>
           </View>
         </TouchableOpacity>
-      </View>
-      <FlatList
-        data={vcardDetails}
-        keyExtractor={item => item.id?.toString() || Math.random().toString()}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📇</Text>
-            <Text style={styles.emptyTitle}>No Contact Cards Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Scanned business cards will appear here
+        <View style={{paddingTop: 20}}>
+          <TextInput
+            placeholder="Search here!"
+            value={searchText}
+            onChangeText={setSearchText}
+            style={styles.input}
+            placeholderTextColor="white"
+          />
+          <View
+            style={{
+              position: 'absolute',
+              top: 35,
+              left: '75%',
+              flexDirection: 'row',
+              gap: 10,
+            }}>
+            <Text onPress={handleSearch} style={{fontSize: 15}}>
+              🔍
             </Text>
+            <TouchableOpacity onPress={clearSearch}>
+              <Text style={{fontSize: 15, color: 'white'}}>X</Text>
+            </TouchableOpacity>
           </View>
-        }
-      />
+        </View>
+      </View>
+
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : (
+        <FlatList
+          data={isSearchActive ? results : vcardDetails}
+          keyExtractor={item => item.id?.toString() || Math.random().toString()}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📇</Text>
+              <Text style={styles.emptyTitle}>No Contact Cards Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Scanned business cards will appear here
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
@@ -290,6 +330,24 @@ const styles = StyleSheet.create({
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  input: {
+    height: 48,
+    borderColor: 'white',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: 40,
+
+    marginBottom: 20,
+
+    fontSize: 16,
   },
   tag: {
     backgroundColor: '#e0e7ff',
