@@ -10,11 +10,18 @@ import {
   Alert,
   StatusBar,
   TextInput,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
 import {usePersonalStore} from '../../store/userPersonalStore';
+import {textColor} from '../../assets/pngs/Colors/color';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {launchImageLibrary} from 'react-native-image-picker';
+import {openPrepopulatedDB} from '../../services/db';
+import {userDetails} from '../../services/userDeatils'; // Ensure this import is correct
 
 const PersonalDataScreen: React.FC = () => {
   const [isEditing, setIsEditing] = React.useState(false);
@@ -25,6 +32,36 @@ const PersonalDataScreen: React.FC = () => {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const email = AsyncStorage.getItem('email');
+
+  const {updateUserDetail} = userDetails();
+
+  const handleSelectImage = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.7,
+        includeBase64: true,
+      },
+      response => {
+        if (response.didCancel) return;
+        if (response.errorCode) {
+          Alert.alert(
+            'Error',
+            response.errorMessage || 'Image selection failed',
+          );
+          return;
+        }
+
+        const asset = response.assets?.[0];
+        console.log('Selected image asset:', asset);
+        if (asset?.base64) {
+          const imageUri = `data:${asset.type};base64,${asset.base64}`;
+          setEditedData(prev => ({...prev, profileImage: imageUri}));
+        }
+      },
+    );
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -50,12 +87,56 @@ const PersonalDataScreen: React.FC = () => {
     navigation.navigate('CreateEvent');
   };
 
-  const handleEditProfile = () => {
+  // const handleEditProfile = () => {
+  //   if (isEditing) {
+  //     setFormData(editedData); // save to store
+
+  //     Alert.alert('Success', 'Profile updated!');
+  //   }
+  //   setIsEditing(!isEditing); // toggle mode
+  // };
+
+  const handleEditProfile = async () => {
     if (isEditing) {
-      setFormData(editedData); // save to store
-      Alert.alert('Success', 'Profile updated!');
+      try {
+        const db = await openPrepopulatedDB();
+
+        const detail = {
+          name: `${editedData.firstName} ${editedData.lastName}`,
+          phone: editedData.phone,
+          password: '', // or the actual value if available
+          linkedln: editedData.linkedln,
+          bio: '',
+          organization: editedData.organization,
+          designation: editedData.designation,
+          profileImage: editedData.profileImage,
+          email: editedData.email,
+        };
+
+        const original = {
+          name: `${formData.firstName} ${formData.lastName}`,
+          phone: formData.phone,
+          password: '',
+          linkedln: formData.linkedln,
+          bio: '',
+          organization: formData.organization,
+          designation: formData.designation,
+          profileImage: formData.profileImage,
+          email: formData.email,
+        };
+
+        await updateUserDetail(db, detail, original);
+        setFormData(editedData);
+        console.log('Profile updated successfully:', editedData);
+        console.log();
+        Alert.alert('Success', 'Profile updated!');
+      } catch (err) {
+        console.log('Update error:', err);
+        Alert.alert('Update Failed', 'Could not update user profile.');
+      }
     }
-    setIsEditing(!isEditing); // toggle mode
+
+    setIsEditing(prev => !prev);
   };
 
   const renderDetailItem = (
@@ -90,7 +171,7 @@ const PersonalDataScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#3498DB" />
+      <StatusBar barStyle="light-content" backgroundColor={textColor.bg} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -102,11 +183,35 @@ const PersonalDataScreen: React.FC = () => {
               transform: [{translateY: slideAnim}],
             },
           ]}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {getInitials(formData.firstName, formData.lastName)}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.backIcon}
+            onPress={() => navigation.navigate('Home')}>
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={textColor.secondColor}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => {
+              if (isEditing) handleSelectImage();
+            }}
+            activeOpacity={isEditing ? 0.7 : 1}>
+            {editedData.profileImage ? (
+              <Image
+                source={{uri: editedData.profileImage}}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {getInitials(editedData.firstName, editedData.lastName)}
+              </Text>
+            )}
+          </TouchableOpacity>
+
           <Text style={styles.headerName}>
             {`${formData.firstName} ${formData.lastName}`}
           </Text>
@@ -173,49 +278,6 @@ const PersonalDataScreen: React.FC = () => {
               'linkedln',
               true,
             )}
-
-            {/* {renderDetailItem(<Icon name="person" size={24} color="#4292c6" />, 'First Name', formData.firstName)}
-            {renderDetailItem(<Icon name="person" size={24} color="#4292c6" />, 'Last Name', formData.lastName)}
-            {renderDetailItem(<Icon name="email" size={24} color="#4292c6" />, 'Email', formData.email)}
-            {renderDetailItem(<Icon name="phone" size={24} color="#4292c6" />, 'Phone', formData.phone)}
-            {renderDetailItem(<Icon name="home" size={24} color="#4292c6" />, 'Organization', formData.organization)}
-            {renderDetailItem(<Icon name="work" size={24} color="#4292c6" />, 'Designation', formData.designation)}
-            {renderDetailItem(<IconT name="linkedin-square" size={24} color="#0077B5" />, 'Linkedln', formData.linkedln)}
-    */}
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actionButtonsContainer}>
-            <Animated.View style={{transform: [{scale: buttonScale}]}}>
-              <TouchableOpacity
-                style={styles.createEventButton}
-                onPress={handleCreateEvent}
-                activeOpacity={0.9}>
-                <View style={styles.buttonContent}>
-                  <Text style={styles.buttonIcon}>🎉</Text>
-                  <View>
-                    <Text style={styles.buttonTitle}>Create Event</Text>
-                    <Text style={styles.buttonSubtitle}>
-                      Plan something amazing
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-
-            <TouchableOpacity
-              onPress={() => navigation.navigate('VcardHistory')}
-              style={styles.secondaryButton}
-              activeOpacity={0.8}>
-              <Text style={styles.secondaryButtonText}>📅 View Vcards</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('ScanQr')}>
-              <Text style={styles.secondaryButtonText}> Scanner</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </Animated.View>
@@ -229,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#3498DB',
+    backgroundColor: textColor.bg,
     paddingTop: 20,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
@@ -239,12 +301,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
+  backIcon: {
+    position: 'absolute',
+    top: 10,
+    left: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+
   input: {
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
     paddingVertical: 4,
     fontSize: 16,
     color: '#2C3E50',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarContainer: {
     width: 80,

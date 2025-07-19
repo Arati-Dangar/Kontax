@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+const {height} = Dimensions.get('window');
 
 import useScanStore from '../../store/useScanStore';
 import {useEventStore} from '../../store/useEventStore';
@@ -23,6 +24,9 @@ import AudioRecorder from '../../components/AudioRecorder';
 import VoiceNotePlayer from '../../components/VouceNotePlayer';
 import {TagModal} from '../../components/TagModel';
 import {getIntentStyle, synergyTags} from '../../constants/intentData';
+import Header from '../../components/Header';
+import {useNavigation} from '@react-navigation/native';
+import {textColor} from '../../assets/pngs/Colors/color';
 
 const {width} = Dimensions.get('window');
 
@@ -31,6 +35,7 @@ interface IntentOption {
   label: string;
   icon: string;
   description: string;
+  color: string;
 }
 
 interface VcardDetail {
@@ -59,24 +64,42 @@ const intentOptions: IntentOption[] = [
     label: 'Networking',
     icon: '🤝',
     description: 'Connect with like-minded people',
+    color: 'grey',
   },
   {
     id: 'partnership',
     label: 'Partnership',
     icon: '🤝',
     description: 'Explore business collaborations',
+    color: 'green',
   },
   {
     id: 'exploration',
-    label: 'Exploration',
+    label: 'Exploring Market/Ideas',
     icon: '🔍',
     description: 'Discover new opportunities',
+    color: 'yellow',
   },
   {
-    id: 'nothing_specific',
-    label: 'Nothing Specific',
+    id: 'selling product',
+    label: 'Selling Product/Services',
     icon: '🎯',
-    description: 'Just going with the flow',
+    description: 'Promote your offerings',
+    color: 'purple',
+  },
+  {
+    id: 'hiring',
+    label: 'Hiring',
+    icon: '👥',
+    description: 'Find talented individuals',
+    color: 'blue',
+  },
+  {
+    id: 'custom',
+    label: 'Custom Intent',
+    icon: '⚡',
+    description: 'Define your own purpose',
+    color: 'brown',
   },
 ];
 
@@ -110,6 +133,7 @@ const ContactDetailsForm = () => {
 
   const {eventData} = useEventStore();
   const [showIntentModal, setShowIntentModal] = useState<boolean>(false);
+  const navigation = useNavigation();
 
   const modalScale = useRef(new Animated.Value(0.8)).current;
 
@@ -271,10 +295,10 @@ const ContactDetailsForm = () => {
     }));
   };
 
-  const handleIntentSelect = (intent: IntentOption) => {
-    handleInputChange('intent', intent.label);
-    setShowIntentModal(false);
-  };
+  // const handleIntentSelect = (intent: IntentOption) => {
+  //   handleInputChange('intent', intent.label);
+  //   setShowIntentModal(false);
+  // };
 
   const openIntentModal = () => {
     setShowIntentModal(true);
@@ -314,20 +338,87 @@ const ContactDetailsForm = () => {
     });
   };
 
-  const renderIntentOption = ({item}: {item: IntentOption}) => (
-    <TouchableOpacity
-      style={styles.intentOption}
-      onPress={() => handleIntentSelect(item)}
-      activeOpacity={0.7}>
-      <View style={styles.intentOptionContent}>
-        <Text style={styles.intentIcon}>{item.icon}</Text>
-        <View style={styles.intentTextContainer}>
-          <Text style={styles.intentLabel}>{item.label}</Text>
-          <Text style={styles.intentDescription}>{item.description}</Text>
+  const renderIntentOption = ({item}: {item: IntentOption}) => {
+    if (item.id === 'custom') {
+      return (
+        <View style={[styles.intentOption, {paddingBottom: 16}]}>
+          <Text style={styles.inputLabel}>Enter Custom Intent</Text>
+          <TextInput
+            placeholder="Type your custom intent"
+            placeholderTextColor="#A0A0A0"
+            style={{
+              borderWidth: 1,
+              borderColor: '#ccc',
+              borderRadius: 8,
+              padding: 10,
+              fontSize: 16,
+              color: '#2C3E50',
+            }}
+            value={
+              eventData.intent &&
+              !intentOptions.find(opt => opt.label === eventData.intent)
+                ? eventData.intent
+                : ''
+            }
+            onChangeText={text => handleInputChange('intent', text)}
+          />
+
+          <TouchableOpacity
+            style={{
+              marginTop: 10,
+              backgroundColor: '#9B59B6',
+              paddingVertical: 10,
+              borderRadius: 8,
+              alignItems: 'center',
+            }}
+            onPress={() => {
+              if (eventData.intent.trim()) {
+                setShowIntentModal(false);
+              }
+            }}>
+            <Text style={{color: '#fff', fontWeight: '600'}}>
+              Save Custom Intent
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      );
+    }
+
+    const isSelected = eventData.intent === item.label;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.intentOption,
+          isSelected && {backgroundColor: '#EEE6F6', borderRadius: 10},
+        ]}
+        onPress={() => handleIntentSelect(item)}
+        activeOpacity={0.7}>
+        <View style={styles.intentOptionContent}>
+          <Text style={styles.intentIcon}>{item.icon}</Text>
+          <View style={styles.intentTextContainer}>
+            <Text style={styles.intentLabel}>{item.label}</Text>
+            <Text style={styles.intentDescription}>{item.description}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // const renderIntentOption = ({item}: {item: IntentOption}) => (
+  //   <TouchableOpacity
+  //     style={styles.intentOption}
+  //     onPress={() => handleIntentSelect(item)}
+  //     activeOpacity={0.7}>
+  //     <View style={styles.intentOptionContent}>
+  //       <Text style={styles.intentIcon}>{item.icon}</Text>
+  //       <View style={styles.intentTextContainer}>
+  //         <Text style={styles.intentLabel}>{item.label}</Text>
+  //         <Text style={styles.intentDescription}>{item.description}</Text>
+  //       </View>
+  //     </View>
+  //   </TouchableOpacity>
+  // );
   const [isTagsModalVisible, setTagsModalVisible] = useState(false);
 
   const openTagsModal = () => setTagsModalVisible(true);
@@ -356,6 +447,13 @@ const ContactDetailsForm = () => {
   //   }
   // };
 
+  const handleIntentSelect = (intent: IntentOption) => {
+    console.log('Intent selected:', intent.label);
+    handleInputChange('intent', intent.label);
+    setShowIntentModal(false);
+  };
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-30)).current;
   const updateField = (field: string, value: string) => {
     setYourData(prev => ({
       ...prev,
@@ -365,8 +463,8 @@ const ContactDetailsForm = () => {
 
   const getProfileInitials = () => {
     const firstInitial =
-      formData.firstName?.charAt(0)?.toUpperCase() ||
-      formData.name?.firstName?.charAt(0)?.toUpperCase() ||
+      formData?.firstName?.charAt(0)?.toUpperCase() ||
+      formData?.name?.firstName?.charAt(0)?.toUpperCase() ||
       '';
     const lastInitial =
       formData.lastName?.charAt(0)?.toUpperCase() ||
@@ -384,6 +482,20 @@ const ContactDetailsForm = () => {
       .filter(tag => tag);
   };
 
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   const getSelectedIntentIcon = () => {
     const selectedIntent = intentOptions.find(
       option => option.label === yourData.intent,
@@ -394,19 +506,17 @@ const ContactDetailsForm = () => {
   if (currentScreen === 'vcard') {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#6366f1" />
-        <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.header}>
-          <TouchableOpacity
-            onPress={() => setCurrentScreen('form')}
-            style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#fff" />
-            <Text style={styles.backButtonText}>Back to Form</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Contact Card</Text>
-        </LinearGradient>
+        <StatusBar barStyle="light-content" backgroundColor={textColor.bg} />
+
+        <Header
+          fadeAnim={fadeAnim}
+          slideAnim={slideAnim}
+          title="Contact Card"
+          containerStyle={{paddingBottom: 30, paddingTop: 20}}
+          onBackPress={() => navigation.navigate('Home')}
+        />
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Profile Card */}
           <View style={styles.profileCard}>
             <LinearGradient
               colors={['#667eea', '#764ba2']}
@@ -432,7 +542,6 @@ const ContactDetailsForm = () => {
             )}
           </View>
 
-          {/* Contact Information */}
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>Contact Information</Text>
 
@@ -473,7 +582,6 @@ const ContactDetailsForm = () => {
             )}
           </View>
 
-          {/* Event Information */}
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>Event Details</Text>
 
@@ -511,9 +619,6 @@ const ContactDetailsForm = () => {
               <Icon name="target" size={20} color="#10b981" />
               <View style={[styles.infoContent, {flex: 0}]}>
                 <Text style={styles.infoLabel}>Purpose</Text>
-                {/* <Text style={styles.infoValue}>
-                  {eventData.intent || formData.intent || 'no'}
-                </Text> */}
 
                 <Text
                   style={[
@@ -526,7 +631,6 @@ const ContactDetailsForm = () => {
             </View>
           </View>
 
-          {/* Notes */}
           {yourData.note && (
             <View style={styles.infoSection}>
               <Text style={styles.sectionTitle}>Personal Notes</Text>
@@ -534,35 +638,20 @@ const ContactDetailsForm = () => {
             </View>
           )}
 
-          <View style={{}}>
-            {yourData.intent && (
-              <View style={[styles.infoSection]}>
-                <Text style={styles.sectionTitle}>Your Intent</Text>
-                <Text
-                  style={[
-                    styles.notesText,
-                    styles.summaryValutIntent,
-                    getIntentStyle(yourData.intent),
-                    {alignSelf: 'flex-start'},
-                  ]}>
-                  {yourData.intent}
-                </Text>
-              </View>
-            )}
-          </View>
-          {/* Tags */}
-          {/* {getTagsPreview().length > 0 && (
-            <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>Tags</Text>
-              <View style={styles.tagsContainer}>
-                {getTagsPreview().map((tag, index) => (
-                  <View key={index} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
+          {yourData.intent && (
+            <View style={[styles.infoSection]}>
+              <Text style={styles.sectionTitle}>Your Intent</Text>
+              <Text
+                style={[
+                  styles.notesText,
+                  styles.summaryValutIntent,
+                  getIntentStyle(yourData.intent),
+                  {alignSelf: 'flex-start'},
+                ]}>
+                {yourData.intent}
+              </Text>
             </View>
-          )} */}
+          )}
 
           {getTagsPreview().length > 0 && (
             <View style={styles.infoSection}>
@@ -599,13 +688,15 @@ const ContactDetailsForm = () => {
   // Main Form Screen
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#6366f1" />
-      <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.header}>
-        <Text style={styles.headerTitle}>vCard Creator</Text>
-        <Text style={styles.headerSubtitle}>
-          Create professional contact cards
-        </Text>
-      </LinearGradient>
+      <StatusBar barStyle="light-content" backgroundColor={textColor.bg} />
+
+      <Header
+        fadeAnim={fadeAnim}
+        slideAnim={slideAnim}
+        title="vCard Creator"
+        subtitle="Create professional contact cards"
+        containerStyle={{paddingTop: 20}}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.formSection}>
@@ -759,22 +850,6 @@ const ContactDetailsForm = () => {
             />
           </View>
 
-          {/* <View style={styles.inputContainer}>
-            <Icon
-              name="tag"
-              size={18}
-              color="#9ca3af"
-              style={styles.inputIcon}
-            />
-            <TextInput
-              placeholder="Tags (comma separated)"
-              value={yourData.tags}
-              onChangeText={text => updateField('tags', text)}
-              style={styles.textInput}
-              placeholderTextColor="#9ca3af"
-            />
-          </View> */}
-
           <View style={styles.inputContainer}>
             <TouchableOpacity
               style={[styles.inputWrapper, styles.dropdownWrapper]}
@@ -798,7 +873,7 @@ const ContactDetailsForm = () => {
           </View>
 
           <View style={styles.inputContainer}>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={[styles.inputWrapper, styles.dropdownWrapper]}
               onPress={openIntentModal}
               activeOpacity={0.8}>
@@ -809,6 +884,24 @@ const ContactDetailsForm = () => {
                   !yourData.intent && styles.placeholderText,
                 ]}>
                 {yourData.intent || 'Select your intent'}
+              </Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </TouchableOpacity> */}
+
+            <TouchableOpacity
+              style={[styles.inputWrapper, styles.inputWrapperError]}
+              onPress={() => {
+                console.log('Opening intent modal');
+                setShowIntentModal(true);
+              }}
+              activeOpacity={0.7}>
+              <Text style={styles.inputIcon}>{getSelectedIntentIcon()}</Text>
+              <Text
+                style={[
+                  styles.dateText,
+                  {color: yourData.intent ? '#2C3E50' : '#A0A0A0'},
+                ]}>
+                {yourData.intent || 'Select event intent'}
               </Text>
               <Text style={styles.dropdownArrow}>▼</Text>
             </TouchableOpacity>
@@ -823,7 +916,6 @@ const ContactDetailsForm = () => {
           />
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
             onPress={createVCard}
@@ -852,7 +944,7 @@ const ContactDetailsForm = () => {
         </View>
       </ScrollView>
 
-      <Modal
+      {/* <Modal
         visible={showIntentModal}
         transparent={true}
         animationType="none"
@@ -889,7 +981,36 @@ const ContactDetailsForm = () => {
             </Animated.View>
           </TouchableOpacity>
         </TouchableOpacity>
-      </Modal>
+      </Modal> */}
+
+      {showIntentModal && (
+        <Modal
+          visible={showIntentModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowIntentModal(false)}>
+          <View style={styles.intentModalOverlay}>
+            <View style={styles.intentModalContainer}>
+              <View style={styles.intentModalHeader}>
+                <Text style={styles.intentModalTitle}>Select Event Intent</Text>
+                <TouchableOpacity
+                  style={styles.intentModalClose}
+                  onPress={() => setShowIntentModal(false)}>
+                  <Text style={styles.intentModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={intentOptions}
+                renderItem={renderIntentOption}
+                keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.intentModalContent}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
       <TagModal
         visible={isTagsModalVisible}
         onClose={closeTagsModal}
@@ -937,12 +1058,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     // backgroundColor: 'grey',
   },
+  // Intent Modal Styles
+  intentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  intentModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: width * 0.9,
+    maxHeight: height * 0.7,
+  },
+  intentModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F2F6',
+  },
+  intentModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  intentModalClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F8F9FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  intentModalCloseText: {
+    fontSize: 16,
+    color: '#7F8C8D',
+  },
+  intentModalContent: {
+    paddingVertical: 16,
+  },
   inputWrapperFocused: {
     borderColor: '#9B59B6',
     backgroundColor: '#FFFFFF',
   },
   inputWrapperError: {
     borderColor: '#E74C3C',
+  },
+  dateText: {
+    flex: 1,
+    fontSize: 16,
   },
   input: {
     flex: 1,

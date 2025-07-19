@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import {useScanDetails} from '../../services/useScanDetails';
 import Icon1 from 'react-native-vector-icons/MaterialIcons';
@@ -16,14 +17,26 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 import VoiceNotePlayer from '../../components/VouceNotePlayer';
 import {
+  getIntentMatchScore,
   getIntentStyle,
   getTagsPreview,
   synergyTags,
 } from '../../constants/intentData';
+import Header from '../../components/Header';
+import {exportSingleCSV, exportSingleVCard} from '../../components/exportVcard';
+import {database} from '../../../firebaseConfig';
+import {get, ref} from '@react-native-firebase/database';
+import NetInfo from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {getUserVcards} from '../../services/firebase_services/getUserVcard';
 
 const EventHistoryScreen = () => {
-  const {vcardDetails, deleteVcardDetail, searchVcardDetails} =
-    useScanDetails();
+  const {
+    vcardDetails,
+    deleteVcardDetail,
+    searchVcardDetails,
+    searchVcardsUniversal,
+  } = useScanDetails();
 
   console.log('Vcard Details:', vcardDetails);
   const navigation = useNavigation();
@@ -33,10 +46,71 @@ const EventHistoryScreen = () => {
   const [loading, setLoading] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      const netState = await NetInfo.fetch();
+      const userId = await AsyncStorage.getItem('userId');
+      console.log('Network connected:', netState.isConnected);
+      console.log('Current userId from AsyncStorage:', userId);
+
+      if (!userId) {
+        console.warn('No userId found in AsyncStorage');
+        return;
+      }
+
+      if (netState.isConnected) {
+        try {
+          const fetchedVcards = await getUserVcards(userId); // ⬅️ Wait for result
+          console.log('Fetched vCards:', fetchedVcards);
+
+          if (Array.isArray(fetchedVcards)) {
+            setResults(fetchedVcards);
+            setIsSearchActive(true);
+          } else {
+            console.warn('No vCards found or data not in expected format');
+            setResults([]);
+          }
+        } catch (error) {
+          console.log('Error fetching from Firebase Realtime DB:', error);
+          setResults([]);
+        }
+      } else {
+        console.log('Offline mode, loading from SQLite');
+        setResults(vcardDetails);
+        setIsSearchActive(true);
+      }
+    };
+
+    fetchData();
+  }, [vcardDetails]);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const handleSearch = async () => {
+    const userId = await AsyncStorage.getItem('userId');
     setIsSearchActive(true);
     setLoading(true);
-    const data = await searchVcardDetails(searchText, intentFilter);
+    // const data = await searchVcardDetails(searchText, intentFilter);
+    const data = await searchVcardsUniversal(userId, database, {
+      searchText,
+      intentFilter,
+    });
     setResults(data);
     setLoading(false);
   };
@@ -202,6 +276,26 @@ const EventHistoryScreen = () => {
           </View>
         )}
 
+        {item.intent &&
+          item.yourIntent &&
+          (() => {
+            const matchScore = getIntentMatchScore(
+              item.intent,
+              item.yourIntent,
+            );
+            console.log('Match Score:', matchScore);
+            if (!matchScore) return null;
+
+            return (
+              <View style={styles.matchScoreContainer}>
+                <Text style={styles.matchScoreText}>
+                  🤝 Match Score:{' '}
+                  <Text style={styles.matchScoreHighlight}>{matchScore}</Text>
+                </Text>
+              </View>
+            );
+          })()}
+
         {item.tags && (
           <View style={styles.contactRow}>
             <Text style={styles.intentLabel}>Tags:</Text>
@@ -238,58 +332,66 @@ const EventHistoryScreen = () => {
         <Text style={styles.dateText}>
           Scanned on {formatDate(item.eventDetails?.date || item.date)}
         </Text>
+
+        <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
+          <TouchableOpacity
+            style={{backgroundColor: '#2563eb', padding: 8, borderRadius: 6}}
+            onPress={() => exportSingleCSV(item)}>
+            <Text style={{color: 'white'}}>CSV</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{backgroundColor: '#16a34a', padding: 8, borderRadius: 6}}
+            onPress={() => exportSingleVCard(item)}>
+            <Text style={{color: 'white'}}>vCard</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  const searchBar = (
+    <View style={{paddingTop: 10}}>
+      <TextInput
+        placeholder="Search here!"
+        value={searchText}
+        onChangeText={setSearchText}
+        style={{
+          borderWidth: 1,
+          borderColor: 'white',
+          color: 'white',
+          borderRadius: 10,
+          padding: 10,
+          paddingLeft: 15,
+        }}
+        placeholderTextColor="white"
+      />
+      <View
+        style={{
+          position: 'absolute',
+          top: 20,
+          right: 30,
+          flexDirection: 'row',
+          gap: 10,
+        }}>
+        <Text onPress={handleSearch} style={{fontSize: 15}}>
+          🔍
+        </Text>
+        <TouchableOpacity onPress={clearSearch}>
+          <Text style={{fontSize: 15, color: 'white'}}>X</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View
-        style={{
-          backgroundColor: '#87CEFA',
-          height: 'auto',
-          borderBottomLeftRadius: 30,
-          borderBottomRightRadius: 30,
-        }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{}}>
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: 8,
-              left: 30,
-              paddingTop: 30,
-              alignItems: 'center',
-            }}>
-            <Icon name="arrow-back" size={24} color="white" />
-            <Text style={{color: 'white', fontSize: 18}}>Back</Text>
-          </View>
-        </TouchableOpacity>
-        <View style={{paddingTop: 20}}>
-          <TextInput
-            placeholder="Search here!"
-            value={searchText}
-            onChangeText={setSearchText}
-            style={styles.input}
-            placeholderTextColor="white"
-          />
-          <View
-            style={{
-              position: 'absolute',
-              top: 35,
-              left: '75%',
-              flexDirection: 'row',
-              gap: 10,
-            }}>
-            <Text onPress={handleSearch} style={{fontSize: 15}}>
-              🔍
-            </Text>
-            <TouchableOpacity onPress={clearSearch}>
-              <Text style={{fontSize: 15, color: 'white'}}>X</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
+      <Header
+        fadeAnim={fadeAnim}
+        slideAnim={slideAnim}
+        onBackPress={() => navigation.goBack()}
+        renderFooter={searchBar}
+      />
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
@@ -369,6 +471,24 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 4,
   },
+  matchScoreContainer: {
+    backgroundColor: '#ecfdf5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  matchScoreText: {
+    color: '#065f46',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  matchScoreHighlight: {
+    fontWeight: '700',
+    color: '#059669',
+  },
+
   summaryValutIntent: {
     fontSize: 16,
     padding: 4,

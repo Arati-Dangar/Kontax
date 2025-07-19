@@ -1,39 +1,3 @@
-// import { create } from 'zustand';
-
-// interface EventData {
-//   title: string;
-//   date: string;
-//   intent: string;
-//   location:string;
-// }
-
-// interface EventStore {
-//   eventData: EventData;
-//   setEventData: (data: Partial<EventData>) => void;
-//   resetEventData: () => void;
-// }
-
-// export const useEventStore = create<EventStore>((set) => ({
-//   eventData: {
-//     title: '',
-//     date: '',
-//     intent: '',
-//     location:'',
-//   },
-//   setEventData: (data) =>
-//     set((state) => ({
-//       eventData: { ...state.eventData, ...data },
-//     })),
-//   resetEventData: () =>
-//     set(() => ({
-//       eventData: {
-//         title: '',
-//         date: '',
-//         intent: '',
-//         location:'',
-//       },
-//     })),
-// }));
 import {create} from 'zustand';
 import {persist} from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -43,6 +7,7 @@ interface EventData {
   date: string;
   intent: string;
   location: string;
+  description?: string;
 }
 
 interface EventStore {
@@ -59,6 +24,7 @@ export const useEventStore = create<EventStore>()(
         date: '',
         intent: '',
         location: '',
+        description: '',
       },
       setEventData: data =>
         set(state => ({
@@ -71,6 +37,7 @@ export const useEventStore = create<EventStore>()(
             date: '',
             intent: '',
             location: '',
+            description: '',
           },
         })),
     }),

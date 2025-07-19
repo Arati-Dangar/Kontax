@@ -23,6 +23,8 @@ import {useEventStore} from '../../store/useEventStore';
 import {usePersonalStore} from '../../store/userPersonalStore';
 import {useNavigation} from '@react-navigation/native';
 import {getIntentStyle} from '../../constants/intentData';
+import {pushSharedQrCode} from '../../services/firebase_services/pushSharedQrCode';
+import Header from '../../components/Header';
 
 interface UserDetails {
   firstName: string;
@@ -53,32 +55,69 @@ const QrCodeScreen: React.FC = () => {
   const [qrData, setQrData] = useState<QRData | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(true); // Add online state
+  const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  const [manualMode, setManualMode] = useState<boolean>(true); // null = auto
+  const [manualMode, setManualMode] = useState<boolean>(true);
 
-  const [qrValue, setQrValue] = useState<string>(''); // Add QR value state
+  const [qrValue, setQrValue] = useState<string>('');
 
   const {eventData} = useEventStore();
   const {formData: sampleUserData} = usePersonalStore();
-
   const generateUrl = () => {
     const baseUrl = 'http://harshpatel958.github.io/kontax-landing/';
     const params = new URLSearchParams();
-    const combinedData = {
-      ...sampleUserData,
-      ...eventData,
-    };
-    Object.keys(combinedData).forEach(key => {
-      if (combinedData[key]) {
-        params.append(key, combinedData[key]);
-      }
-    });
+
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      organization,
+      designation,
+      linkedln,
+    } = sampleUserData;
+
+    const {title, date, intent, location} = eventData;
+
+    // Only add selected fields if they exist
+    if (firstName) params.append('firstName', firstName);
+    if (lastName) params.append('lastName', lastName);
+    if (email) params.append('email', email);
+    if (phone) params.append('phone', phone);
+    if (organization) params.append('organization', organization);
+    if (designation) params.append('designation', designation);
+    if (linkedln) params.append('linkedln', linkedln);
+
+    if (title) params.append('title', title);
+    if (date) params.append('date', date);
+    if (intent) params.append('intent', intent);
+    if (location) params.append('location', location);
 
     const finalUrl = `${baseUrl}?${params.toString()}`;
     console.log('Generated URL:', finalUrl);
     return finalUrl;
   };
+
+  // const generateUrl = () => {
+  //   const baseUrl = 'http://harshpatel958.github.io/kontax-landing/';
+  //   console.log('Sample User Data:', sampleUserData);
+  //   console.log('Event Data:', eventData);
+  //   const params = new URLSearchParams();
+
+  //   const combinedData = {
+  //     ...sampleUserData,
+  //     ...eventData,
+  //   };
+  //   Object.keys(combinedData).forEach(key => {
+  //     if (combinedData[key]) {
+  //       params.append(key, combinedData[key]);
+  //     }
+  //   });
+
+  //   const finalUrl = `${baseUrl}?${params.toString()}`;
+  //   console.log('Generated URL:', finalUrl);
+  //   return finalUrl;
+  // };
   const generateVCard = () => {
     const {
       firstName,
@@ -257,6 +296,42 @@ const QrCodeScreen: React.FC = () => {
       return false;
     }
   };
+  const modeSwitch = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+      <Text style={{marginRight: 10, fontWeight: 'bold', color: '#2C3E50'}}>
+        Mode: {manualMode ? 'Online' : 'Offline'}
+      </Text>
+      <TouchableOpacity
+        style={{
+          backgroundColor: '#27AE60',
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 20,
+        }}
+        onPress={() => {
+          if (manualMode) setManualMode(false);
+          else setManualMode(true);
+        }}>
+        <Text
+          style={{
+            fontWeight: 'bold',
+
+            padding: 3,
+            paddingHorizontal: 4,
+            borderColor: 'green',
+
+            borderRadius: 20,
+            // backgroundColor: 'yellow',
+          }}>
+          Switch to: {manualMode ? 'Offline' : 'Online'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const handleShareQR = async () => {
     if (!qrData || !qrRef.current) {
@@ -269,7 +344,6 @@ const QrCodeScreen: React.FC = () => {
     try {
       qrRef.current.toDataURL(async dataURL => {
         try {
-          // Convert base64 to file
           const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
           const fileName = `qr-event-${Date.now()}.png`;
           const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
@@ -288,7 +362,16 @@ const QrCodeScreen: React.FC = () => {
             type: 'image/png',
           };
 
-          await RNShare.open(shareOptions);
+          const result = await RNShare.open(shareOptions);
+
+          if (result.success || result.app) {
+            // ✅ Only push to Firebase if shared via app
+            await pushSharedQrCode(
+              qrData.event.title,
+              qrData.event.date,
+              isEffectiveOnline,
+            );
+          }
           setIsProcessing(false);
         } catch (err) {
           console.error('Share failed:', err);
@@ -444,65 +527,16 @@ const QrCodeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#27AE60" />
+      <StatusBar barStyle="light-content" backgroundColor="" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Animated.View
-          style={[
-            styles.headerContent,
-            {
-              opacity: fadeAnim,
-              transform: [{translateY: slideAnim}],
-            },
-          ]}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Event QR Code</Text>
-          <Text style={styles.headerSubtitle}>
-            Share your event details instantly{' '}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginTop: 10,
-              }}>
-              <Text
-                style={{marginRight: 10, fontWeight: 'bold', color: '#2C3E50'}}>
-                Mode: {manualMode ? 'Online' : 'Offline'}
-              </Text>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#27AE60',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                }}
-                onPress={() => {
-                  if (manualMode) setManualMode(false);
-                  else setManualMode(true);
-                }}>
-                <Text
-                  style={{
-                    color: 'green',
-                    fontWeight: 'bold',
-                    borderWidth: 1,
-                    padding: 3,
-                    paddingHorizontal: 4,
-                    borderColor: 'yellow',
-                    borderRadius: 20,
-                    backgroundColor: 'yellow',
-                  }}>
-                  Switch to: {manualMode ? 'Offline' : 'Online'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Text>
-        </Animated.View>
-      </View>
+      <Header
+        fadeAnim={fadeAnim}
+        slideAnim={slideAnim}
+        title="Event QR Code"
+        subtitle=" Share your event details instantly"
+        onBackPress={() => navigation.goBack()}
+        renderFooter={modeSwitch}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -642,19 +676,6 @@ const QrCodeScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Debug Info (Remove in production) */}
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            QR Ref Status: {qrRef.current ? '✅ Ready' : '❌ Not Ready'}
-          </Text>
-          <Text style={styles.debugText}>
-            Network: {isOnline ? '🌐 Online' : '📱 Offline'}
-          </Text>
-          <Text style={styles.debugText}>
-            QR Type: {isOnline ? 'URL' : 'vCard'}
-          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>

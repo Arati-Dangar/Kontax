@@ -13,26 +13,34 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconT from 'react-native-vector-icons/FontAwesome';
+import {textColor} from '../../assets/pngs/Colors/color';
+import {openPrepopulatedDB} from '../../services/db';
+import {userDetails} from '../../services/userDeatils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {launchImageLibrary} from 'react-native-image-picker';
+import {set} from '@react-native-firebase/database';
 
 interface FormData {
   firstName: string;
   lastName: string;
-  email: string;
+  bio: string;
   phone: string;
 
   organization: string;
   designation: string;
   linkedln: string;
+  profileImage: string;
 }
 
 interface FormErrors {
   firstName?: string;
   lastName?: string;
-  email?: string;
+  bio?: string;
   phone?: string;
   organization: string;
   designation: string;
@@ -62,11 +70,6 @@ const PersonalDetailsFormScreen: React.FC = () => {
     ]).start();
   }, []);
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
   const validatePhone = (phone: string): boolean => {
     const phoneRegex = /^\+?[\d\s-()]{10,}$/;
 
@@ -82,12 +85,6 @@ const PersonalDetailsFormScreen: React.FC = () => {
 
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
     }
 
     if (!formData.phone.trim()) {
@@ -119,31 +116,75 @@ const PersonalDetailsFormScreen: React.FC = () => {
     }
   };
 
-  const handleSubmit = () => {
-    if (validateForm()) {
-      Alert.alert(
-        'Success!',
-        'Personal details have been saved successfully.',
-        [{text: 'OK'}],
-      );
-      console.log('Form Data:', formData);
-    } else {
+  const {addPersonalDetail} = userDetails();
+  const handleSelectImage = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.7,
+        includeBase64: true,
+      },
+      response => {
+        if (response.didCancel) return;
+        if (response.errorCode) {
+          Alert.alert(
+            'Error',
+            response.errorMessage || 'Image selection failed',
+          );
+          return;
+        }
+
+        const asset = response.assets?.[0];
+        if (asset?.base64) {
+          const imageUri = `data:${asset.type};base64,${asset.base64}`;
+          setFormData({...formData, profileImage: imageUri});
+        }
+      },
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       Alert.alert(
         'Validation Error',
         'Please fill in all required fields correctly.',
         [{text: 'OK'}],
       );
+      return;
     }
-    setFormData(formData);
-    console.log(formData);
-    navigation.navigate('PersonalData');
+
+    try {
+      const db = await openPrepopulatedDB();
+
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+
+      const updatedUser = {
+        name: fullName, // ✅ combine first + last
+
+        phone: formData.phone,
+
+        linkedln: formData.linkedln,
+        bio: formData.bio,
+        organization: formData.organization,
+        designation: formData.designation,
+        profileImage: '', // or formData.profileImage
+        createdAt: new Date().toISOString(),
+      };
+
+      await addPersonalDetail(db, updatedUser);
+
+      navigation.navigate('PrivacyControl');
+    } catch (error) {
+      console.log('Submit error:', error);
+      Alert.alert('Error', 'Failed to update user.');
+    }
   };
 
   const renderInput = (
     field: keyof FormData,
     placeholder: string,
     icon: React.ReactNode,
-    keyboardType: 'default' | 'email-address' | 'phone-pad' = 'default',
+    keyboardType: 'default' | 'phone-pad' = 'default',
   ) => {
     const isFocused = focusedField === field;
     const hasError = !!errors[field];
@@ -158,10 +199,15 @@ const PersonalDetailsFormScreen: React.FC = () => {
           ]}>
           <Text style={styles.inputIcon}>{icon}</Text>
           <TextInput
-            style={styles.input}
             placeholder={placeholder}
             placeholderTextColor="#A0A0A0"
             value={formData[field]}
+            multiline={field === 'bio'}
+            numberOfLines={field === 'bio' ? 4 : 1}
+            style={[
+              styles.input,
+              field === 'bio' && {height: 100, textAlignVertical: 'top'},
+            ]}
             onChangeText={value => handleInputChange(field, value)}
             onFocus={() => setFocusedField(field)}
             onBlur={() => setFocusedField('')}
@@ -194,6 +240,23 @@ const PersonalDetailsFormScreen: React.FC = () => {
             <Text style={styles.title}>Personal Details</Text>
             <Text style={styles.subtitle}>Please fill in your information</Text>
           </View>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handleSelectImage}
+            activeOpacity={0.7}>
+            {formData.profileImage ? (
+              <Image
+                source={{uri: formData.profileImage}}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {formData.firstName?.charAt(0).toUpperCase() ?? '?'}
+                {formData.lastName?.charAt(0).toUpperCase() ?? ''}
+              </Text>
+            )}
+          </TouchableOpacity>
 
           <ScrollView
             style={styles.formContainer}
@@ -202,39 +265,40 @@ const PersonalDetailsFormScreen: React.FC = () => {
             {renderInput(
               'firstName',
               'First Name',
-              <Icon name="person" size={24} color="#4292c6" />,
+              <Icon name="person" size={24} color={textColor.bg} />,
             )}
             {renderInput(
               'lastName',
               'Last Name',
-              <Icon name="person" size={24} color="#4292c6" />,
+              <Icon name="person" size={24} color={textColor.bg} />,
             )}
-            {renderInput(
-              'email',
-              'Email Address',
-              <Icon name="email" size={24} color="#4292c6" />,
-              'email-address',
-            )}
+
             {renderInput(
               'phone',
               'Phone Number',
-              <Icon name="phone" size={24} color="#4292c6" />,
+              <Icon name="phone" size={24} color={textColor.bg} />,
               'phone-pad',
             )}
             {renderInput(
               'organization',
               'Organization',
-              <Icon name="home" size={24} color="#4292c6" />,
+              <Icon name="home" size={24} color={textColor.bg} />,
             )}
             {renderInput(
               'designation',
               'Designation',
-              <Icon name="work" size={24} color="#4292c6" />,
+              <Icon name="work" size={24} color={textColor.bg} />,
             )}
             {renderInput(
               'linkedln',
               'Linkedln',
-              <IconT name="linkedin-square" size={24} color="#0077B5" />,
+              <IconT name="linkedin-square" size={24} color={textColor.bg} />,
+            )}
+
+            {renderInput(
+              'bio',
+              'Enter your bio',
+              <IconT name="user" size={20} color={textColor.bg} />,
             )}
 
             <TouchableOpacity
@@ -266,10 +330,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 30,
   },
+  avatarContainer: {
+    alignSelf: 'center',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#3498DB',
+  },
+
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: textColor.bg,
     marginBottom: 8,
   },
   subtitle: {
@@ -325,7 +415,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   submitButton: {
-    backgroundColor: '#3498DB',
+    backgroundColor: textColor.bg,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

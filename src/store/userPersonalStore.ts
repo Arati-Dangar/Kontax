@@ -7,6 +7,8 @@ interface FormData {
   lastName: string;
   email: string;
   phone: string;
+  bio: string;
+  profileImage: string;
   organization: string;
   designation: string;
   linkedln: string;
@@ -16,15 +18,18 @@ interface PersonalStore {
   formData: FormData;
   setFormData: (data: Partial<FormData>) => void;
   resetForm: () => void;
+  logout: () => Promise<void>;
 }
 export const usePersonalStore = create<PersonalStore>()(
   persist(
-    set => ({
+    (set, get) => ({
       formData: {
         firstName: '',
         lastName: '',
         email: '',
         phone: '',
+        profileImage: '',
+        bio: '',
         organization: '',
         designation: '',
         linkedln: '',
@@ -40,11 +45,19 @@ export const usePersonalStore = create<PersonalStore>()(
             lastName: '',
             email: '',
             phone: '',
+            profileImage: '',
+            bio: '',
             organization: '',
             designation: '',
             linkedln: '',
           },
         })),
+
+      logout: async () => {
+        get().resetForm();
+
+        await AsyncStorage.removeItem('user-storage');
+      },
     }),
     {
       name: 'user-storage', // key name in storage

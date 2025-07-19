@@ -12,7 +12,20 @@
           "package_name": "com.kontaxapplication"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+         {
+          "client_id": "983347847554-9501vpvtu6er6nt8c99vqpuqjtplvnle.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kontaxapplication",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "983347847554-hdg578i68ebvjqiutgrihohiq4jeu731.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAP9Bk3iHkDZ6FTGO9VUbPBvMTNQ-nfY2g"
@@ -20,7 +33,13 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+
+             {
+              "client_id": "983347847554-hdg578i68ebvjqiutgrihohiq4jeu731.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
